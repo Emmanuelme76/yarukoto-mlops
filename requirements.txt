@@ -1,0 +1,19 @@
+# Manipulación de datos y Machine Learning
+numpy
+pandas
+scikit-learn
+joblib
+
+# MLOps: Tracking, Versionado y Monitoreo
+mlflow
+dvc
+evidently
+
+# API Backend y Frontend estático
+fastapi
+uvicorn
+pydantic
+
+# Testing (CI/CD)
+pytest
+httpx
