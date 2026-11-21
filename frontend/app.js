@@ -25,19 +25,73 @@ const SUBCATEGORIES = {
   ],
 };
 
-let currentUser = localStorage.getItem("yarukoto_user") || "alumno_1";
+let currentUser = localStorage.getItem("yarukoto_user") || "";
 let activeTasks = [];
 let timers = {}; // { taskId: { seconds: number, running: boolean, intervalId: number } }
 
 // --- Inicialización ---
 document.addEventListener("DOMContentLoaded", () => {
-  document.getElementById("currentUserLabel").textContent = currentUser;
+  initDueDateInput();
   onCategoryChange();
   checkApiHealth();
-  loadUserTasks();
 
   document.getElementById("taskForm").addEventListener("submit", handleCreateTask);
+
+  if (!currentUser) {
+    openAuthModal(true);
+  } else {
+    updateUserHeaderUI();
+    loadUserTasks();
+  }
 });
+
+// --- Calendario y Cálculo de Días Restantes ---
+function getLocalISODate(offsetDays = 0) {
+  const date = new Date();
+  date.setDate(date.getDate() + offsetDays);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function initDueDateInput() {
+  const dateInput = document.getElementById("fecha_entrega");
+  dateInput.min = getLocalISODate(0);
+  dateInput.value = getLocalISODate(2); // Por defecto +2 días
+  updateDaysRemainingHint();
+}
+
+function getDaysUntilDueDate() {
+  const dateStr = document.getElementById("fecha_entrega").value;
+  if (!dateStr) return 0;
+
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const target = new Date(y, m - 1, d);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  const diffMs = target - today;
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+  return Math.max(0, diffDays);
+}
+
+function updateDaysRemainingHint() {
+  const days = getDaysUntilDueDate();
+  const hint = document.getElementById("daysRemainingHint");
+  if (days === 0) {
+    hint.textContent = "Entrega hoy";
+  } else if (days === 1) {
+    hint.textContent = "Entrega mañana (1 día)";
+  } else {
+    hint.textContent = `En ${days} días`;
+  }
+}
+
+function onDueDateChange() {
+  updateDaysRemainingHint();
+  triggerLivePrediction();
+}
 
 // --- Estado de API y Modelo ---
 async function checkApiHealth() {
@@ -50,33 +104,118 @@ async function checkApiHealth() {
   }
 }
 
-// --- Gestión de Usuario (Login rápido) ---
-function openUserModal() {
-  const modal = document.getElementById("userModal");
+// --- Gestión de Perfiles y Sesión ---
+function getSavedProfiles() {
+  try {
+    return JSON.parse(localStorage.getItem("yarukoto_profiles") || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function saveProfileRecord(username, role) {
+  const profiles = getSavedProfiles();
+  const existingIdx = profiles.findIndex((p) => p.username.toLowerCase() === username.toLowerCase());
+  const record = {
+    username,
+    role: role || "Estudiante",
+    lastUsed: new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "short" }),
+  };
+
+  if (existingIdx >= 0) {
+    profiles[existingIdx] = record;
+  } else {
+    profiles.unshift(record);
+  }
+  localStorage.setItem("yarukoto_profiles", JSON.stringify(profiles.slice(0, 6)));
+}
+
+function updateUserHeaderUI() {
+  const profiles = getSavedProfiles();
+  const profile = profiles.find((p) => p.username === currentUser);
+  document.getElementById("currentUserLabel").textContent = currentUser;
+  document.getElementById("currentUserRoleLabel").textContent = profile ? profile.role : "Perfil activo";
+  document.getElementById("userAvatarBadge").textContent = currentUser.slice(0, 2).toUpperCase();
+}
+
+function openAuthModal(forceLogin = false) {
+  const modal = document.getElementById("authModal");
+  const closeBtn = document.getElementById("closeAuthModalBtn");
+  closeBtn.style.display = forceLogin ? "none" : "block";
+
+  renderSavedAccounts();
   modal.classList.remove("hidden");
   modal.classList.add("flex");
 }
 
-function closeUserModal() {
-  const modal = document.getElementById("userModal");
+function closeAuthModal() {
+  if (!currentUser) return;
+  const modal = document.getElementById("authModal");
   modal.classList.add("hidden");
   modal.classList.remove("flex");
 }
 
-function selectPresetUser(username) {
-  currentUser = username;
-  localStorage.setItem("yarukoto_user", currentUser);
-  document.getElementById("currentUserLabel").textContent = currentUser;
-  closeUserModal();
-  loadUserTasks();
-  triggerLivePrediction();
+function renderSavedAccounts() {
+  const profiles = getSavedProfiles();
+  const section = document.getElementById("savedAccountsSection");
+  const list = document.getElementById("savedAccountsList");
+
+  if (profiles.length === 0) {
+    section.classList.add("hidden");
+    return;
+  }
+
+  section.classList.remove("hidden");
+  list.innerHTML = "";
+
+  profiles.forEach((prof) => {
+    const isCurrent = prof.username === currentUser;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.onclick = () => switchAccount(prof.username, prof.role);
+    btn.className = `w-full flex items-center justify-between p-3 rounded-xl border transition text-left ${
+      isCurrent
+        ? "bg-indigo-600/10 border-indigo-500/40"
+        : "bg-slate-950 border-slate-800 hover:border-slate-700"
+    }`;
+
+    btn.innerHTML = `
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg bg-slate-800 text-indigo-400 font-bold text-xs flex items-center justify-center uppercase">
+          ${prof.username.slice(0, 2)}
+        </div>
+        <div>
+          <p class="text-sm font-semibold text-white">${prof.username}</p>
+          <p class="text-[11px] text-slate-400">${prof.role} · Último acceso: ${prof.lastUsed}</p>
+        </div>
+      </div>
+      ${
+        isCurrent
+          ? `<span class="text-[11px] font-medium px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300">Activa</span>`
+          : `<span class="text-xs text-slate-500">Entrar →</span>`
+      }
+    `;
+    list.appendChild(btn);
+  });
 }
 
-function saveCustomUser() {
-  const input = document.getElementById("customUserInput").value.trim();
-  if (!input) return;
-  selectPresetUser(input);
-  document.getElementById("customUserInput").value = "";
+function switchAccount(username, role) {
+  currentUser = username;
+  localStorage.setItem("yarukoto_user", currentUser);
+  saveProfileRecord(username, role);
+  updateUserHeaderUI();
+  closeAuthModal();
+  loadUserTasks();
+}
+
+function handleAuthSubmit(e) {
+  e.preventDefault();
+  const username = document.getElementById("authUsernameInput").value.trim();
+  const role = document.getElementById("authRoleInput").value;
+  if (!username) return;
+
+  document.getElementById("authUsernameInput").value = "";
+  switchAccount(username, role);
 }
 
 // --- Subcategoría Híbrida ---
@@ -123,25 +262,25 @@ function getEffectiveSubcategory() {
 // --- Construir Payload para ML ---
 function buildFeaturePayload() {
   const now = new Date();
-  // JS getDay(): 0=Domingo -> convertir a 0=Lunes ... 6=Domingo
   const jsDay = now.getDay();
   const diaSemana = jsDay === 0 ? 6 : jsDay - 1;
 
   return {
-    usuario: currentUser,
+    usuario: currentUser || "invitado",
     categoria: document.getElementById("categoria").value,
     subcategoria: getEffectiveSubcategory(),
     prioridad: parseInt(document.getElementById("prioridad").value, 10),
     complejidad: parseInt(document.getElementById("complejidad").value, 10),
     dia_semana: diaSemana,
     hora_creacion: now.getHours(),
-    dias_para_entrega: parseInt(document.getElementById("dias_para_entrega").value || "0", 10),
+    dias_para_entrega: getDaysUntilDueDate(),
     tareas_pendientes: activeTasks.length,
   };
 }
 
 // --- Predicción en Tiempo Real ---
 async function triggerLivePrediction() {
+  if (!currentUser) return;
   const payload = buildFeaturePayload();
   try {
     const res = await fetch("/api/predict", {
@@ -177,6 +316,7 @@ async function triggerLivePrediction() {
 
 // --- CRUD de Tareas ---
 async function loadUserTasks() {
+  if (!currentUser) return;
   try {
     const res = await fetch(`/api/tasks/${encodeURIComponent(currentUser)}`);
     activeTasks = await res.json();
@@ -211,6 +351,15 @@ async function handleCreateTask(e) {
   } catch (err) {
     console.error("Error creando tarea:", err);
   }
+}
+
+function formatDueDateBadge(days) {
+  const target = new Date();
+  target.setDate(target.getDate() + days);
+  const formatted = target.toLocaleDateString("es-MX", { day: "2-digit", month: "short" });
+  if (days === 0) return `Hoy (${formatted})`;
+  if (days === 1) return `Mañana (${formatted})`;
+  return `${formatted} (en ${days}d)`;
 }
 
 function renderTasks() {
@@ -253,7 +402,7 @@ function renderTasks() {
         <div class="flex flex-wrap items-center gap-4 text-xs text-slate-400">
           <span>Estimado ML: <strong class="text-indigo-400">${task.tiempo_estimado_min} min</strong></span>
           <span>Complejidad: <strong class="text-slate-200">${task.complejidad}/5</strong></span>
-          <span>Entrega en: <strong class="text-slate-200">${task.dias_para_entrega}d</strong></span>
+          <span>Límite: <strong class="text-slate-200">${formatDueDateBadge(task.dias_para_entrega)}</strong></span>
         </div>
       </div>
 

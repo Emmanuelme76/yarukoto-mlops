@@ -51,14 +51,19 @@
         </button>
       </nav>
 
-      <!-- Usuario Activo / Cambio rápido -->
+      <!-- Menú de Cuenta Activa -->
       <div class="flex items-center gap-3">
-        <div class="text-right hidden sm:block">
-          <p class="text-xs text-slate-400">Sesión activa</p>
-          <p id="currentUserLabel" class="text-sm font-semibold text-indigo-400">alumno_1</p>
-        </div>
-        <button onclick="openUserModal()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-slate-200 transition">
-          Cambiar usuario
+        <button onclick="openAuthModal()" class="flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 transition group">
+          <div id="userAvatarBadge" class="w-7 h-7 rounded-lg bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 font-bold text-xs flex items-center justify-center uppercase">
+            U
+          </div>
+          <div class="text-left hidden sm:block">
+            <p id="currentUserLabel" class="text-xs font-semibold text-slate-200 group-hover:text-white leading-tight">Sin sesión</p>
+            <p id="currentUserRoleLabel" class="text-[10px] text-slate-500 leading-tight">Cambiar cuenta</p>
+          </div>
+          <svg class="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
         </button>
       </div>
     </div>
@@ -119,7 +124,7 @@
                 class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-indigo-500/50 text-sm text-white placeholder-slate-500 focus:outline-none" />
             </div>
 
-            <div class="grid grid-cols-3 gap-3">
+            <div class="grid grid-cols-2 gap-3">
               <div>
                 <label class="block text-xs font-medium text-slate-400 mb-1">Prioridad</label>
                 <select id="prioridad" onchange="triggerLivePrediction()"
@@ -141,12 +146,16 @@
                   <option value="5">5 - Experto</option>
                 </select>
               </div>
+            </div>
 
-              <div>
-                <label class="block text-xs font-medium text-slate-400 mb-1">Días p/ entrega</label>
-                <input type="number" id="dias_para_entrega" min="0" max="60" value="2" onchange="triggerLivePrediction()" oninput="triggerLivePrediction()"
-                  class="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-indigo-500" />
+            <!-- Selector de Fecha Límite (Calendario) -->
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <label for="fecha_entrega" class="block text-xs font-medium text-slate-400">Fecha límite de entrega</label>
+                <span id="daysRemainingHint" class="text-[11px] font-medium text-indigo-400">En 2 días</span>
               </div>
+              <input type="date" id="fecha_entrega" required onchange="onDueDateChange()"
+                class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-indigo-500 [color-scheme:dark]" />
             </div>
 
             <!-- Tarjeta de Predicción ML en Tiempo Real -->
@@ -252,43 +261,54 @@
 
   </main>
 
-  <!-- MODAL 1: LOGIN RÁPIDO POR USUARIO -->
-  <div id="userModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5">
-      <div>
-        <h3 class="text-lg font-bold text-white">Seleccionar Perfil de Usuario</h3>
-        <p class="text-xs text-slate-400 mt-1">El modelo adapta las predicciones de tiempo y cumplimiento según los hábitos de cada usuario.</p>
-      </div>
-
-      <div class="grid grid-cols-2 gap-2.5">
-        <button onclick="selectPresetUser('alumno_1')" class="p-3 rounded-xl bg-slate-950 hover:border-indigo-500 border border-slate-800 text-left transition">
-          <p class="text-sm font-semibold text-white">alumno_1</p>
-          <p class="text-[11px] text-slate-400">Ritmo estándar</p>
-        </button>
-        <button onclick="selectPresetUser('alumno_2')" class="p-3 rounded-xl bg-slate-950 hover:border-indigo-500 border border-slate-800 text-left transition">
-          <p class="text-sm font-semibold text-white">alumno_2</p>
-          <p class="text-[11px] text-slate-400">Tareas largas</p>
-        </button>
-        <button onclick="selectPresetUser('profe')" class="p-3 rounded-xl bg-slate-950 hover:border-indigo-500 border border-slate-800 text-left transition">
-          <p class="text-sm font-semibold text-white">profe</p>
-          <p class="text-[11px] text-slate-400">Alta disciplina</p>
-        </button>
-        <button onclick="selectPresetUser('invitado')" class="p-3 rounded-xl bg-slate-950 hover:border-indigo-500 border border-slate-800 text-left transition">
-          <p class="text-sm font-semibold text-white">invitado</p>
-          <p class="text-[11px] text-slate-400">Demo general</p>
+  <!-- MODAL 1: GESTIÓN DE CUENTA / INICIO DE SESIÓN -->
+  <div id="authModal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md hidden items-center justify-center z-50 p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-6">
+      <div class="flex items-start justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/20">
+            や
+          </div>
+          <div>
+            <h3 class="text-lg font-bold text-white">Tu espacio en Yarukoto</h3>
+            <p class="text-xs text-slate-400">El modelo personaliza tiempos y riesgo según tu historial.</p>
+          </div>
+        </div>
+        <button id="closeAuthModalBtn" onclick="closeAuthModal()" class="text-slate-500 hover:text-slate-300 text-sm px-2 py-1">
+          ✕
         </button>
       </div>
 
-      <div class="pt-2 border-t border-slate-800">
-        <label class="block text-xs font-medium text-slate-400 mb-1.5">O ingresa un usuario nuevo:</label>
-        <div class="flex gap-2">
-          <input type="text" id="customUserInput" placeholder="Ej. emma_dev"
-            class="flex-1 px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-indigo-500" />
-          <button onclick="saveCustomUser()" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm font-medium text-white transition">
-            Entrar
-          </button>
+      <!-- Cuentas guardadas en este navegador -->
+      <div id="savedAccountsSection" class="space-y-2">
+        <p class="text-xs font-medium text-slate-400">Cuentas recientes en este equipo</p>
+        <div id="savedAccountsList" class="space-y-2 max-h-44 overflow-y-auto pr-1">
+          <!-- Renderizado dinámicamente desde app.js -->
         </div>
       </div>
+
+      <!-- Formulario de Inicio / Creación de Perfil -->
+      <form onsubmit="handleAuthSubmit(event)" class="space-y-3 pt-2 border-t border-slate-800">
+        <div>
+          <label class="block text-xs font-medium text-slate-400 mb-1">Nombre de usuario o matrícula</label>
+          <input type="text" id="authUsernameInput" required placeholder="Ej. carlos_m, ana_dev, profe..."
+            class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-400 mb-1">Perfil / Rol <span class="text-slate-500">(opcional)</span></label>
+          <select id="authRoleInput"
+            class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-indigo-500">
+            <option value="Estudiante">Estudiante</option>
+            <option value="Desarrollador / TI">Desarrollador / TI</option>
+            <option value="Docente / Evaluador">Docente / Evaluador</option>
+            <option value="Personal">Uso Personal</option>
+          </select>
+        </div>
+        <button type="submit"
+          class="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium shadow-lg shadow-indigo-600/20 transition cursor-pointer">
+          Continuar a mi espacio
+        </button>
+      </form>
     </div>
   </div>
 
