@@ -7,3 +7,5 @@ mlruns/
 mlartifacts/
 reports/*.html
 .DS_Store
+mlflow.db
+models/*.joblib
