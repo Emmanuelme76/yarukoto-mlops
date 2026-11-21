@@ -567,3 +567,15 @@ async function loadDatasetHistory() {
     console.error("Error cargando historial:", err);
   }
 }
+
+async function deleteHistoryRecord(rowIndex) {
+  if (!confirm("¿Eliminar este registro del historial de entrenamiento?")) return;
+  try {
+    const res = await fetch(`/api/dataset/history/${rowIndex}`, { method: "DELETE" });
+    if (res.ok) {
+      await loadDatasetHistory();
+    }
+  } catch (err) {
+    console.error("Error eliminando registro:", err);
+  }
+}
