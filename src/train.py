@@ -37,6 +37,9 @@ NUMERIC_FEATURES = [
 ]
 ALL_FEATURES = CATEGORICAL_FEATURES + NUMERIC_FEATURES
 
+# Tipos confiables requeridos por MLflow/skops para modelos basados en árboles
+TRUSTED_TREE_TYPES = ["sklearn.tree._tree.Tree"]
+
 
 def load_training_data() -> pd.DataFrame:
     ref_path = "data/raw/reference_tasks.csv"
@@ -63,8 +66,8 @@ def build_preprocessor() -> ColumnTransformer:
     )
 
 
-def promote_to_production(client: MlflowClient, model_name: str, run_id: str, artifact_path: str):
-    model_uri = f"runs:/{run_id}/{artifact_path}"
+def promote_to_production(client: MlflowClient, model_name: str, run_id: str, artifact_name: str):
+    model_uri = f"runs:/{run_id}/{artifact_name}"
     registered = mlflow.register_model(model_uri=model_uri, name=model_name)
     client.set_registered_model_alias(
         name=model_name,
@@ -125,7 +128,11 @@ def train_and_register():
             mlflow.log_metric("f1_score", f1)
             mlflow.log_metric("roc_auc", auc)
 
-            mlflow.sklearn.log_model(pipeline, artifact_path="classifier_model")
+            mlflow.sklearn.log_model(
+                pipeline,
+                name="classifier_model",
+                skops_trusted_types=TRUSTED_TREE_TYPES,
+            )
             print(f"[Clasificación - {name}] Accuracy: {acc:.4f} | F1: {f1:.4f} | ROC-AUC: {auc:.4f}")
 
             if f1 > best_clf_f1:
@@ -169,7 +176,11 @@ def train_and_register():
             mlflow.log_metric("rmse_minutes", rmse)
             mlflow.log_metric("r2_score", r2)
 
-            mlflow.sklearn.log_model(pipeline, artifact_path="regressor_model")
+            mlflow.sklearn.log_model(
+                pipeline,
+                name="regressor_model",
+                skops_trusted_types=TRUSTED_TREE_TYPES,
+            )
             print(f"[Regresión - {name}] MAE: {mae:.2f} min | RMSE: {rmse:.2f} min | R2: {r2:.4f}")
 
             if mae < best_reg_mae:
