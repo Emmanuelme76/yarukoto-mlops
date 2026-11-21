@@ -1,0 +1,42 @@
+services:
+  yarukoto-web:
+    build: .
+    container_name: yarukoto-web
+    ports:
+      - "8000:8000"
+    environment:
+      - MLFLOW_TRACKING_URI=sqlite:////app/shared_data/mlflow.db
+    volumes:
+      - ./data:/app/data
+      - ./reports:/app/reports
+      - ./models:/app/models
+      - shared_mlflow:/app/shared_data
+
+  airflow:
+    image: apache/airflow:2.10.3-python3.11
+    container_name: yarukoto-airflow
+    ports:
+      - "8080:8080"
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=SequentialExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=sqlite:////opt/airflow/airflow.db
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__WEBSERVER__SECRET_KEY=yarukoto_secret_key_2026
+      - _AIRFLOW_DB_MIGRATE=true
+      - _AIRFLOW_WWW_USER_CREATE=true
+      - _AIRFLOW_WWW_USER_USERNAME=admin
+      - _AIRFLOW_WWW_USER_PASSWORD=admin
+      - YARUKOTO_PROJECT_ROOT=/opt/airflow/project
+      - YARUKOTO_API_URL=http://yarukoto-web:8000/api/models/reload
+      - MLFLOW_TRACKING_URI=sqlite:////opt/airflow/shared_data/mlflow.db
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - .:/opt/airflow/project
+      - shared_mlflow:/opt/airflow/shared_data
+    command: >
+      bash -c "pip install --no-cache-dir pandas scikit-learn mlflow evidently joblib && airflow standalone"
+    depends_on:
+      - yarukoto-web
+
+volumes:
+  shared_mlflow:
