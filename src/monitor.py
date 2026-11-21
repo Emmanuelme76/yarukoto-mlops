@@ -1,9 +1,15 @@
 import os
-import sys
 import json
 import argparse
 import numpy as np
 import pandas as pd
+import pandas.core.dtypes.common as pd_common
+
+# Parche de compatibilidad: pandas 3.x eliminó infer_dtype_from_object, usado por Evidently AI
+if not hasattr(pd_common, "infer_dtype_from_object"):
+    def _infer_dtype_from_object(dtype):
+        return pd.api.types.infer_dtype(dtype)
+    pd_common.infer_dtype_from_object = _infer_dtype_from_object
 
 # Soporte compatible para Evidently >= 0.7 (API moderna) y <= 0.6 (API clásica)
 try:
@@ -40,7 +46,6 @@ def _create_drifted_sample(ref_df: pd.DataFrame, n_rows: int = 120) -> pd.DataFr
     """Genera un lote de prueba con cambio de hábitos (Data Drift) para demostraciones."""
     np.random.seed(99)
     sample = ref_df.sample(n=min(n_rows, len(ref_df)), random_state=99).copy()
-    # Simular cambio de hábitos: tareas mucho más complejas y mayor carga pendiente
     sample["complejidad"] = np.random.choice([4, 5], size=len(sample), p=[0.4, 0.6])
     sample["tareas_pendientes"] = sample["tareas_pendientes"] + np.random.randint(4, 9, size=len(sample))
     sample["tiempo_real_min"] = (sample["tiempo_real_min"] * 1.45).astype(int)
@@ -74,7 +79,6 @@ def run_monitoring(simulate_drift: bool = False) -> dict:
 
     os.makedirs("reports", exist_ok=True)
 
-    # Ejecutar reporte de Data Drift con Evidently AI
     report = Report(metrics=[DataDriftPreset()])
 
     if EVIDENTLY_V2:
@@ -86,7 +90,6 @@ def run_monitoring(simulate_drift: bool = False) -> dict:
         report.save_html(REPORT_HTML_PATH)
         result_dict = report.as_dict()
 
-    # Extraer resumen de drift detectado
     drift_detected = False
     drifted_columns = 0
     total_columns = len(MONITORED_COLUMNS)
