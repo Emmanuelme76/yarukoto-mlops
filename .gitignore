@@ -9,3 +9,5 @@ reports/*.html
 .DS_Store
 mlflow.db
 models/*.joblib
+data/processed/*.json
+data/processed/*.csv
