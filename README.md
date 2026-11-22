@@ -115,6 +115,8 @@ docker compose up --build
 
 - Yarukoto Web + FastAPI: `http://localhost:8000`
 
+- MLflow UI (Tracking & Registry): `http://localhost:5000`
+
 - Apache Airflow UI: `http://localhost:8080` (Credenciales: `admin` / `admin`)
 
 ## Pruebas Automatizadas
