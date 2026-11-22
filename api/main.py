@@ -194,6 +194,17 @@ def complete_task(task_id: str, body: TaskCompleteRequest):
         "tiempo_real_min": body.tiempo_real_min,
     }
 
+@app.delete("/api/tasks/{task_id}")
+def delete_pending_task(task_id: str):
+    tasks = _read_active_tasks()
+    initial_len = len(tasks)
+    tasks = [t for t in tasks if t["id"] != task_id]
+
+    if len(tasks) == initial_len:
+        raise HTTPException(status_code=404, detail="Tarea no encontrada")
+
+    _write_active_tasks(tasks)
+    return {"message": "Tarea eliminada correctamente.", "task_id": task_id}
 
 @app.get("/api/dataset/history")
 def get_dataset_history(limit: int = 20):
