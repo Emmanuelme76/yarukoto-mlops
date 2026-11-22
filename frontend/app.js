@@ -420,8 +420,14 @@ function renderTasks() {
 
         <!-- Botón Completar / Cerrar -->
         <button onclick="openCompleteModal('${task.id}')"
-          class="px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white border border-emerald-500/30 text-xs font-semibold transition">
+          class="px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white border border-emerald-500/30 text-xs font-semibold transition cursor-pointer">
           Cerrar
+        </button>
+
+        <!-- Botón Eliminar Tarea Pendiente -->
+        <button onclick="deletePendingTask('${task.id}')" title="Descartar tarea"
+          class="px-2.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/20 text-xs font-semibold transition cursor-pointer">
+          ✕
         </button>
       </div>
     `;
@@ -513,6 +519,22 @@ async function submitTaskCompletion() {
   }
 }
 
+async function deletePendingTask(taskId) {
+  if (!confirm("¿Descartar esta tarea pendiente? (No se guardará en el dataset)")) return;
+  try {
+    const res = await fetch(`/api/tasks/${taskId}`, { method: "DELETE" });
+    if (res.ok) {
+      if (timers[taskId] && timers[taskId].intervalId) {
+        clearInterval(timers[taskId].intervalId);
+      }
+      delete timers[taskId];
+      await loadUserTasks();
+    }
+  } catch (err) {
+    console.error("Error eliminando tarea pendiente:", err);
+  }
+}
+
 // --- Navegación de Pestañas ---
 function switchTab(tabName) {
   ["tasks", "history", "monitoring"].forEach((name) => {
@@ -552,6 +574,15 @@ async function loadDatasetHistory() {
           ? `<span class="px-2 py-0.5 rounded-full text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Completada</span>`
           : `<span class="px-2 py-0.5 rounded-full text-xs bg-rose-500/10 text-rose-400 border border-rose-500/20">Abandonada</span>`;
 
+      // Botón condicional: solo se habilita si estamos viendo new_tasks.csv (can_delete === true)
+      const deleteButton = data.can_delete
+        ? `<button onclick="deleteHistoryRecord(${row.row_index})" 
+             title="Eliminar registro"
+             class="px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/20 text-xs font-medium transition cursor-pointer">
+             Eliminar
+           </button>`
+        : `<span class="text-xs text-slate-600">Protegido</span>`;
+
       tr.innerHTML = `
         <td class="py-3 px-4 font-medium text-white">${row.usuario}</td>
         <td class="py-3 px-4">${row.categoria}</td>
@@ -560,10 +591,23 @@ async function loadDatasetHistory() {
         <td class="py-3 px-4">${row.complejidad}/5</td>
         <td class="py-3 px-4">${statusBadge}</td>
         <td class="py-3 px-4 font-mono text-indigo-400">${row.tiempo_real_min} min</td>
+        <td class="py-3 px-4 text-right">${deleteButton}</td>
       `;
       tbody.appendChild(tr);
     });
   } catch (err) {
     console.error("Error cargando historial:", err);
+  }
+}
+
+async function deleteHistoryRecord(rowIndex) {
+  if (!confirm("¿Eliminar este registro del historial de entrenamiento?")) return;
+  try {
+    const res = await fetch(`/api/dataset/history/${rowIndex}`, { method: "DELETE" });
+    if (res.ok) {
+      await loadDatasetHistory();
+    }
+  } catch (err) {
+    console.error("Error eliminando registro:", err);
   }
 }
