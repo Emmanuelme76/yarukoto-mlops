@@ -46,6 +46,10 @@ services:
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=sqlite:////opt/airflow/airflow.db
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
       - AIRFLOW__WEBSERVER__SECRET_KEY=yarukoto_secret_key_2026
+      - AIRFLOW__WEBSERVER__WORKERS=1
+      - AIRFLOW__WEBSERVER__WORKER_REFRESH_INTERVAL=0
+      - AIRFLOW__WEBSERVER__WEB_SERVER_MASTER_TIMEOUT=300
+      - AIRFLOW__WEBSERVER__WEB_SERVER_WORKER_TIMEOUT=300
       - _AIRFLOW_DB_MIGRATE=true
       - _AIRFLOW_WWW_USER_CREATE=true
       - _AIRFLOW_WWW_USER_USERNAME=admin
@@ -58,7 +62,9 @@ services:
       - .:/opt/airflow/project
       - shared_mlflow:/opt/airflow/shared_data
     command: >
-      bash -c "pip install --no-cache-dir pandas scikit-learn mlflow evidently joblib && airflow standalone"
+      bash -c "rm -f /opt/airflow/airflow-webserver.pid &&
+               pip install --no-cache-dir pandas scikit-learn mlflow evidently joblib &&
+               airflow standalone"
     depends_on:
       - yarukoto-web
 
