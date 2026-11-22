@@ -11,6 +11,30 @@ services:
       - ./reports:/app/reports
       - ./models:/app/models
       - shared_mlflow:/app/shared_data
+    command: >
+      sh -c "mkdir -p /app/shared_data &&
+             if [ ! -f /app/shared_data/mlflow.db ]; then
+               python src/generate_data.py &&
+               python src/train.py &&
+               python src/monitor.py;
+             fi &&
+             uvicorn api.main:app --host 0.0.0.0 --port 8000"
+
+  mlflow:
+    build: .
+    container_name: yarukoto-mlflow
+    ports:
+      - "5000:5000"
+    volumes:
+      - shared_mlflow:/app/shared_data
+    command: >
+      mlflow ui
+      --backend-store-uri sqlite:////app/shared_data/mlflow.db
+      --default-artifact-root /app/shared_data/mlruns
+      --host 0.0.0.0
+      --port 5000
+    depends_on:
+      - yarukoto-web
 
   airflow:
     image: apache/airflow:2.10.3-python3.11
