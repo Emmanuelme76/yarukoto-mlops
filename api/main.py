@@ -194,6 +194,17 @@ def complete_task(task_id: str, body: TaskCompleteRequest):
         "tiempo_real_min": body.tiempo_real_min,
     }
 
+@app.delete("/api/tasks/{task_id}")
+def delete_pending_task(task_id: str):
+    tasks = _read_active_tasks()
+    initial_len = len(tasks)
+    tasks = [t for t in tasks if t["id"] != task_id]
+
+    if len(tasks) == initial_len:
+        raise HTTPException(status_code=404, detail="Tarea no encontrada")
+
+    _write_active_tasks(tasks)
+    return {"message": "Tarea eliminada correctamente.", "task_id": task_id}
 
 @app.get("/api/dataset/history")
 def get_dataset_history(limit: int = 20):
@@ -204,14 +215,17 @@ def get_dataset_history(limit: int = 20):
         df = pd.read_csv(REF_TASKS_CSV_PATH)
         source = "Dataset de referencia inicial (reference_tasks.csv)"
     else:
-        return {"source": "empty", "total": 0, "records": []}
+        return {"source": "empty", "total": 0, "records": [], "can_delete": False}
+
+    df_tail = df.tail(limit).iloc[::-1].copy()
+    df_tail["row_index"] = df_tail.index
 
     return {
         "source": source,
         "total": len(df),
-        "records": df.tail(limit).iloc[::-1].to_dict(orient="records"),
+        "records": df_tail.to_dict(orient="records"),
+        "can_delete": os.path.exists(NEW_TASKS_CSV_PATH),
     }
-
 
 @app.get("/monitoring", response_class=HTMLResponse)
 def view_monitoring_report():
@@ -239,3 +253,18 @@ def serve_frontend():
     if os.path.exists(index_path):
         return FileResponse(index_path)
     return {"message": "Yarukoto MLOps API activa. Visita /docs para probar los endpoints."}
+
+@app.delete("/api/dataset/history/{row_index}")
+def delete_dataset_history_record(row_index: int):
+    if not os.path.exists(NEW_TASKS_CSV_PATH):
+        raise HTTPException(
+            status_code=400,
+            detail="Solo se pueden eliminar registros nuevos capturados en producción (new_tasks.csv).",
+        )
+    df = pd.read_csv(NEW_TASKS_CSV_PATH)
+    if row_index < 0 or row_index >= len(df):
+        raise HTTPException(status_code=404, detail="Índice de registro no encontrado")
+
+    df = df.drop(index=row_index).reset_index(drop=True)
+    df.to_csv(NEW_TASKS_CSV_PATH, index=False)
+    return {"message": "Registro eliminado del historial.", "remaining": len(df)}
